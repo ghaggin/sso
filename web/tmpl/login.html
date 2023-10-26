@@ -1,0 +1,60 @@
+{{template "base_layout" .}}
+{{define "base_style"}}
+<style>
+    .page-container {
+        display: flex;
+        width: 100%;
+        height: 100%;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    .element-container {
+        border: 1px solid black;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .element-item {
+        padding: 10px;
+    }
+
+    .element-item a {
+        border: 1px solid black;
+        display: block;
+        padding: 10px;
+        text-decoration: none;
+        color: black;
+    }
+
+    .element-item a:hover {
+        background-color: lightgray;
+    }
+
+    .element-item a:active {
+        color: inherit;
+    }
+</style>
+{{end}}
+
+{{define "base_content"}}
+<div class="page-container">
+    <div class="element-container">
+        <form class="element-item">
+            <label for="username">username:</label><br>
+            <input type="text" id="username" name="username"><br>
+            <label for="password">password:</label><br>
+            <input type="password" id="password" name="password"><br>
+            <input type="submit" value="Submit">
+        </form>
+        <div class="element-item">
+            <a href="/saml/login">Login with localhost:8124</a>
+        </div>
+    </div>
+</div>
+{{end}}
+
+{{define "base_js"}}
+{{end}}

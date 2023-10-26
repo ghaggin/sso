@@ -1,0 +1,32 @@
+{{define "base_layout"}}
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto">
+  <title>{{.PageTitle}}</title>
+
+  <link rel="stylesheet" href="/static/css/base.css" />
+  {{template "base_style" .}}
+</head>
+
+<body>
+  {{template "base_content" .}}
+
+  <script src="/static/javascript/base.js"></script>
+
+  {{template "base_js" .}}
+</body>
+
+</html>
+{{end}}
+
+{{define "base_style"}}
+{{end}}
+{{define "base_content"}}
+{{end}}
+{{define "base_js"}}
+{{end}}

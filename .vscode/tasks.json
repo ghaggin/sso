@@ -1,0 +1,190 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "task1",
+            "detail": "run service provider",
+            "dependsOn": [
+                "open_chrome",
+                "run_sp"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "task2",
+            "detail": "run only identity provider",
+            "dependsOn": [
+                "run_idp"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "task3",
+            "detail": "run only service provider",
+            "dependsOn": [
+                "run_sp"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "task4",
+            "detail": "build service provider",
+            "dependsOn": [
+                "build_sp_idp"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "local_metadata",
+            "detail": "store and upload metadata locally",
+            "dependsOn": [
+                "save_sp_metadata",
+                "upload_sp_metadata"
+            ],
+            "dependsOrder": "sequence",
+            "problemMatcher": []
+        },
+        {
+            "type": "process",
+            "label": "build_sp_idp",
+            "detail": "build service provider",
+            "command": "go",
+            "args": [
+                "build",
+                "-gcflags=all=-N -l",
+                "-o", "sp_idp",
+                "main.go",
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "none",
+            "problemMatcher": [
+                "$go"
+            ],
+            "presentation": {
+                "echo": false,
+                "reveal": "never",
+                "close": true,
+                "panel": "dedicated"
+            }
+        },
+        {
+            "type": "process",
+            "label": "run_idp",
+            "detail": "run identity provider",
+            "command": "sp_idp",
+            "args": [
+                "--mode",
+                "idp",
+                "--port",
+                "8124"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "none",
+            "problemMatcher": [
+                "$go"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "dedicated",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "dependsOn": ["build_sp_idp"],
+        },
+        {
+            "type": "process",
+            "label": "run_sp",
+            "detail": "run service provider",
+            "command": "sp_idp",
+            "args": [
+                "--mode",
+                "sp",
+                "--port",
+                "8123",
+                "--idp",
+                "http://localhost:8124/metadata"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "none",
+            "problemMatcher": [
+                "$go"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "dedicated",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "dependsOn": ["build_sp_idp"]
+        },
+        {
+            "label": "open_chrome",
+            "type": "process",
+            "command": "open",
+            "args": [
+                "-n",
+                "-a",
+                "Google Chrome",
+                "--args",
+                "--incognito",
+                "http://localhost:8123/saml/login"
+            ],
+            "problemMatcher": [],
+            "presentation": {
+                "echo": false,
+                "reveal": "silent",
+                "close": true,
+                "panel": "dedicated"
+            }
+        },
+        {
+            "type": "shell",
+            "label": "save_sp_metadata",
+            "problemMatcher": [],
+            "detail": "store metadata that can be uploaded to an idp",
+            "command": "curl",
+            "args": [
+                "-s",
+                "http://localhost:8123/saml/metadata",
+                ">",
+                "sp_metadata.xml"
+            ],
+            "presentation": {
+                "reveal": "silent",
+                "panel": "dedicated",
+                "showReuseMessage": false,
+                "close": true
+            }
+        },
+        {
+            "type": "process",
+            "label": "upload_sp_metadata",
+            "problemMatcher": [],
+            "detail": "upload sp_metadata.xml to the local idp to an idp",
+            "command": "curl",
+            "args": [
+                "-s",
+                // "localhost:8124/services/sp",
+                "localhost:8124/service",
+                "-d",
+                "@sp_metadata.xml"
+            ],
+            "presentation": {
+                "reveal": "silent",
+                "panel": "dedicated",
+                "showReuseMessage": false,
+                "close": true
+            }
+        },
+    ]
+}
