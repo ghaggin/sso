@@ -2,14 +2,13 @@ package sp
 
 import (
 	"context"
-	"encoding/gob"
 	"fmt"
 	"net/http"
 	"time"
 
-	scs "github.com/alexedwards/scs/v2"
 	"github.com/crewjam/saml/samlsp"
 	"github.com/ghaggin/sso/internal/config"
+	"github.com/ghaggin/sso/internal/middleware"
 	"github.com/ghaggin/sso/internal/template"
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/fx"
@@ -19,36 +18,44 @@ import (
 type ServiceProvider struct {
 	log    *zap.Logger
 	server *http.Server
+	sm     *middleware.SessionManager
 }
 
 type Params struct {
 	fx.In
 
-	Log    *zap.Logger
-	Config *config.Config
+	Log            *zap.Logger
+	Config         *config.Config
+	SessionManager *middleware.SessionManager
 }
 
 func New(p Params) (*ServiceProvider, error) {
-	samlSP, err := NewSAML(fmt.Sprintf(":%d", p.Config.ServiceProvider.Port), "http://localhost:8124/metadata")
+	samlSP, err := NewSAML(fmt.Sprintf(":%d", p.Config.ServiceProvider.Port), "http://localhost:8124/metadata", p.SessionManager)
 	if err != nil {
 		panic(err)
 	}
 
-	newSessionManager()
+	sp := &ServiceProvider{
+		log: p.Log,
+		server: &http.Server{
+			Addr: fmt.Sprintf("localhost:%d", p.Config.ServiceProvider.Port),
+		},
+		sm: p.SessionManager,
+	}
 
 	root := chi.NewRouter()
-	root.Use(sessionManager.LoadAndSave)
+	root.Use(p.SessionManager.Wrap)
 
 	// Auth
 	root.Group(func(r chi.Router) {
-		r.Use(requireAuth)
-		r.Get("/", home)
+		r.Use(sp.requireAuth)
+		r.Get("/", sp.home)
 		r.Get("/attr", getAttrVals)
 	})
 
 	// No Auth
 	root.Group(func(r chi.Router) {
-		r.HandleFunc("/login", login)
+		r.HandleFunc("/login", sp.login)
 		r.HandleFunc("/saml/login", func(w http.ResponseWriter, r *http.Request) {
 			samlSP.HandleStartAuthFlow(w, r)
 		})
@@ -59,13 +66,8 @@ func New(p Params) (*ServiceProvider, error) {
 		r.Handle("/static/*", http.StripPrefix("/static", http.FileServer(http.Dir("web/static/"))))
 	})
 
-	return &ServiceProvider{
-		log: p.Log,
-		server: &http.Server{
-			Addr:    fmt.Sprintf("localhost:%d", p.Config.ServiceProvider.Port),
-			Handler: root,
-		},
-	}, nil
+	sp.server.Handler = root
+	return sp, nil
 }
 
 func RegisterHooks(lc fx.Lifecycle, s *ServiceProvider) {
@@ -85,30 +87,34 @@ func (s *ServiceProvider) Start(_ context.Context) error {
 	return nil
 }
 
-var sessionManager *scs.SessionManager
-
-func newSessionManager() {
-	gob.Register(&User{})
-
-	sessionManager = scs.New()
-	sessionManager.Lifetime = time.Minute * 3
-}
-
-func home(w http.ResponseWriter, r *http.Request) {
-	user, ok := sessionManager.Get(r.Context(), "user").(*User)
-	if !ok {
+func (s *ServiceProvider) home(w http.ResponseWriter, r *http.Request) {
+	session, err := s.sm.Get(r.Context())
+	if err != nil {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 	}
 
 	template.Render(w, r, "home.html", &template.Data{
 		PageTitle: "home",
-		UID:       user.UID,
+		UID:       session.UID,
 	})
 }
 
-func login(w http.ResponseWriter, r *http.Request) {
+func (s *ServiceProvider) login(w http.ResponseWriter, r *http.Request) {
 	template.Render(w, r, "login.html", &template.Data{
 		PageTitle: "login",
+	})
+}
+
+// Presence of a user in the context indicates auth
+func (s *ServiceProvider) requireAuth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		session, err := s.sm.Get(r.Context())
+		if err != nil || !session.AuthValid || time.Now().After(session.AuthExpiration) {
+			http.Redirect(w, r, "/saml/login", http.StatusSeeOther)
+			return
+		}
+
+		next.ServeHTTP(w, r)
 	})
 }
 
@@ -137,21 +143,4 @@ func getAttrVals(w http.ResponseWriter, r *http.Request) {
 		}
 		fmt.Fprintf(w, "%v: %v\n", attr, fmtAttrVal)
 	}
-}
-
-type User struct {
-	UID string
-}
-
-// Presence of a user in the context indicates auth
-func requireAuth(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, ok := sessionManager.Get(r.Context(), "user").(*User)
-		if !ok {
-			http.Redirect(w, r, "/saml/login", http.StatusSeeOther)
-			return
-		}
-
-		next.ServeHTTP(w, r)
-	})
 }

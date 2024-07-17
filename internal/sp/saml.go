@@ -10,6 +10,7 @@ import (
 	"github.com/crewjam/saml"
 	"github.com/crewjam/saml/samlsp"
 	"github.com/ghaggin/sso/internal/config"
+	"github.com/ghaggin/sso/internal/middleware"
 	dsig "github.com/russellhaering/goxmldsig"
 )
 
@@ -25,9 +26,11 @@ type samlImpl struct {
 	ResponseBinding string
 	OnError         func(w http.ResponseWriter, r *http.Request, err error)
 	RequestTracker  samlsp.RequestTracker
+
+	sm *middleware.SessionManager
 }
 
-func NewSAML(port, idpURL string) (SAML, error) {
+func NewSAML(port, idpURL string, sm *middleware.SessionManager) (SAML, error) {
 	idpMetadataURL, err := url.Parse(idpURL)
 	if err != nil {
 		return nil, err
@@ -89,7 +92,10 @@ func NewSAML(port, idpURL string) (SAML, error) {
 			AllowIDPInitiated:     opts.AllowIDPInitiated,
 			DefaultRedirectURI:    opts.DefaultRedirectURI,
 			LogoutBindings:        opts.LogoutBindings,
-		}}
+		},
+
+		sm: sm,
+	}
 
 	samlSP.RequestTracker = samlsp.DefaultRequestTracker(opts, samlSP.ServiceProvider)
 	if opts.UseArtifactResponse {
@@ -114,6 +120,8 @@ func (s *samlImpl) ServeMetadata(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *samlImpl) ServeACS(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
 	err := r.ParseForm()
 	if err != nil {
 		s.OnError(w, r, err)
@@ -140,7 +148,7 @@ func (s *samlImpl) ServeACS(w http.ResponseWriter, r *http.Request) {
 	for _, as := range assertion.AttributeStatements {
 		for _, a := range as.Attributes {
 			if a.FriendlyName == "uid" && len(a.Values) == 1 {
-				sessionManager.Put(r.Context(), "user", &User{UID: a.Values[0].Value})
+				s.sm.SetAuthenticated(ctx, a.Values[0].Value)
 			}
 		}
 	}

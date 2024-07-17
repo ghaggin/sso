@@ -5,6 +5,7 @@ import (
 
 	"github.com/ghaggin/sso/internal/config"
 	"github.com/ghaggin/sso/internal/idp"
+	"github.com/ghaggin/sso/internal/middleware"
 	"github.com/ghaggin/sso/internal/sp"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -18,6 +19,7 @@ func main() {
 		fx.Provide(
 			zap.NewDevelopment,
 			config.New,
+			middleware.NewSessionManager,
 			// idp.New,
 			// sp.New,
 		),

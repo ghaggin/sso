@@ -73,7 +73,7 @@
             "type": "process",
             "label": "run_idp",
             "detail": "run identity provider",
-            "command": "sp_idp",
+            "command": "${workspaceFolder}/tmp/sp_idp",
             "args": [
                 "--mode",
                 "idp",
@@ -99,7 +99,7 @@
             "type": "process",
             "label": "run_sp",
             "detail": "run service provider",
-            "command": "sp_idp",
+            "command": "${workspaceFolder}/tmp/sp_idp",
             "args": [
                 "--mode",
                 "sp",
@@ -151,7 +151,7 @@
                 "-s",
                 "http://localhost:8123/saml/metadata",
                 ">",
-                "sp_metadata.xml"
+                "@${workspaceFolder}/tmp/sp_metadata.xml"
             ],
             "presentation": {
                 "reveal": "silent",
@@ -170,7 +170,7 @@
                 "-s",
                 "localhost:8124/service",
                 "-d",
-                "@sp_metadata.xml"
+                "@${workspaceFolder}/tmp/sp_metadata.xml"
             ],
             "presentation": {
                 "reveal": "silent",
