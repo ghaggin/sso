@@ -30,7 +30,7 @@
             "label": "task4",
             "detail": "build service provider",
             "dependsOn": [
-                "build_sp_idp"
+                "local_metadata"
             ],
             "problemMatcher": []
         },
@@ -151,7 +151,7 @@
                 "-s",
                 "http://localhost:8123/saml/metadata",
                 ">",
-                "@${workspaceFolder}/tmp/sp_metadata.xml"
+                "${workspaceFolder}/tmp/sp_metadata.xml"
             ],
             "presentation": {
                 "reveal": "silent",

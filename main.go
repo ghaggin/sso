@@ -15,13 +15,16 @@ func main() {
 	var mode = flag.String("mode", "", "either sp or idp")
 	flag.Parse()
 
+	newMode := func() config.Mode {
+		return config.Mode(*mode)
+	}
+
 	deps := fx.Options(
 		fx.Provide(
 			zap.NewDevelopment,
 			config.New,
 			middleware.NewSessionManager,
-			// idp.New,
-			// sp.New,
+			newMode,
 		),
 	)
 
@@ -32,12 +35,14 @@ func main() {
 			fx.Provide(sp.New),
 			fx.Invoke(sp.RegisterHooks),
 		)
-	} else {
+	} else if *mode == "idp" {
 		app = fx.New(
 			deps,
-			fx.Provide(idp.New),
+			idp.Module,
 			fx.Invoke(idp.RegisterHooks),
 		)
+	} else {
+		panic("unrecognized mode")
 	}
 
 	app.Run()

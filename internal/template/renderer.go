@@ -15,7 +15,7 @@ type Data struct {
 	UID       string
 }
 
-func Render(w http.ResponseWriter, r *http.Request, tmpl string, td *Data) error {
+func Render(w http.ResponseWriter, r *http.Request, tmpl string, td any) error {
 	t, err := template.ParseFiles(
 		templateDir+"/"+tmpl,
 		templateDir+"/"+"base.html",
