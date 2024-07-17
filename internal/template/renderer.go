@@ -1,4 +1,4 @@
-package internal
+package template
 
 import (
 	"bytes"
@@ -10,12 +10,12 @@ const (
 	templateDir string = "web/tmpl"
 )
 
-type templateData struct {
+type Data struct {
 	PageTitle string
 	UID       string
 }
 
-func renderTemplate(w http.ResponseWriter, r *http.Request, tmpl string, td *templateData) error {
+func Render(w http.ResponseWriter, r *http.Request, tmpl string, td *Data) error {
 	t, err := template.ParseFiles(
 		templateDir+"/"+tmpl,
 		templateDir+"/"+"base.html",

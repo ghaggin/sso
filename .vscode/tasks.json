@@ -52,7 +52,7 @@
             "args": [
                 "build",
                 "-gcflags=all=-N -l",
-                "-o", "sp_idp",
+                "-o", "${workspaceFolder}/tmp/sp_idp",
                 "main.go",
             ],
             "options": {
@@ -77,8 +77,6 @@
             "args": [
                 "--mode",
                 "idp",
-                "--port",
-                "8124"
             ],
             "options": {
                 "cwd": "${workspaceFolder}"
@@ -105,10 +103,6 @@
             "args": [
                 "--mode",
                 "sp",
-                "--port",
-                "8123",
-                "--idp",
-                "http://localhost:8124/metadata"
             ],
             "options": {
                 "cwd": "${workspaceFolder}"
@@ -174,7 +168,6 @@
             "command": "curl",
             "args": [
                 "-s",
-                // "localhost:8124/services/sp",
                 "localhost:8124/service",
                 "-d",
                 "@sp_metadata.xml"

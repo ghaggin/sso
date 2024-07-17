@@ -1,4 +1,4 @@
-package internal
+package idp
 
 import (
 	"bytes"
@@ -79,6 +79,7 @@ func (s *SamlIdentityProvider) GetSession(w http.ResponseWriter, r *http.Request
 		UserSurname:           "9",
 		UserGivenName:         "10",
 		UserScopedAffiliation: "11",
+		CustomAttributes:      []saml.Attribute{},
 	}
 }
 

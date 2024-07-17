@@ -1,4 +1,6 @@
-# Test IDP/SP
+# SSO
+
+Implementation of a test Identity Provider and Service Provider
 
 ## Setup
 Generate self-signed key pair for the service provider
@@ -6,30 +8,25 @@ Generate self-signed key pair for the service provider
 ./gen_certs.sh sp localhost:8123
 ```
 
-Generate self-signed key pair for the service provider
+Generate self-signed key pair for the identity provider
 ```lang=bash
 ./gen_certs.sh idp localhost:8124
 ```
 
-## Run SP with samltest.id
-Upload metadata to samltest.id.  
-1. Run task1 to generate metadata file
-2. Navigate to https://samltest.id/upload.php
-3. Upload file sp_metadata.xml
+## Test SP<>IDP integration
+1. Run IDP
+```
+go run main.go -mode idp
+```
+2. Run SP
+```
+go run main.go -mode sp
+```
+Warning: IDP login will not work until the SP is added as a service provider to the IDP
 
-## Run local SP
+3. Upload SP metadata.xml file to IDP by running both the SP and the IDP and then running these commands
 ```
-go run main.go --mode sp --port 8123 --idp http://localhost:8124/metadata
+curl -s http://localhost:8123/saml/metadata > tmp/sp_metadata.xml
+curl localhost:8124/service -d @tmp/sp_metadata.xml
 ```
-Note: idp can be the metadata endpoint for samltest.id as well
-
-## Run local IDP
-```
-go run main.go --mode idp --port 8124
-```
-
-Upload SP metadata.xml file to IDP by running both the SP and the IDP and then running these commands
-```
-curl http://localhost:8123/saml/metadata > sp_metadata.xml
-curl localhost:8124/service -d @sp_metadata.xml
-```
+4. Navigate to [http://localhost:8123](http://localhost:8123) to test the login flow

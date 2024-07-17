@@ -3,20 +3,40 @@ package main
 import (
 	"flag"
 
-	"github.com/ghaggin/test-idp/internal"
+	"github.com/ghaggin/sso/internal/config"
+	"github.com/ghaggin/sso/internal/idp"
+	"github.com/ghaggin/sso/internal/sp"
+	"go.uber.org/fx"
+	"go.uber.org/zap"
 )
 
 func main() {
 	var mode = flag.String("mode", "", "either sp or idp")
-	var port = flag.Int("port", 0, "port to run the server on")
-	var idpURL = flag.String("idp", "", "idp url")
 	flag.Parse()
 
+	deps := fx.Options(
+		fx.Provide(
+			zap.NewDevelopment,
+			config.New,
+			// idp.New,
+			// sp.New,
+		),
+	)
+
+	var app *fx.App
 	if *mode == "sp" {
-		internal.ServiceProvider(*port, *idpURL)
-	} else if *mode == "idp" {
-		internal.IdentityProvider(*port)
+		app = fx.New(
+			deps,
+			fx.Provide(sp.New),
+			fx.Invoke(sp.RegisterHooks),
+		)
 	} else {
-		panic("unrecognized mode")
+		app = fx.New(
+			deps,
+			fx.Provide(idp.New),
+			fx.Invoke(idp.RegisterHooks),
+		)
 	}
+
+	app.Run()
 }

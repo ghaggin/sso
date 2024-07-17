@@ -1,32 +1,35 @@
-package internal
+package sp
 
 import (
-	"bufio"
+	"context"
 	"encoding/gob"
 	"fmt"
 	"net/http"
-	"os"
 	"time"
 
 	scs "github.com/alexedwards/scs/v2"
 	"github.com/crewjam/saml/samlsp"
+	"github.com/ghaggin/sso/internal/config"
+	"github.com/ghaggin/sso/internal/template"
 	"github.com/go-chi/chi/v5"
+	"go.uber.org/fx"
+	"go.uber.org/zap"
 )
 
-var sessionManager *scs.SessionManager
-
-func newSessionManager() {
-	gob.Register(&User{})
-
-	sessionManager = scs.New()
-	sessionManager.Lifetime = time.Minute * 3
+type ServiceProvider struct {
+	log    *zap.Logger
+	server *http.Server
 }
 
-func ServiceProvider(p int, idpURL string) {
-	fmt.Printf("running service provider on port %v\n", p)
-	port := fmt.Sprintf(":%v", p)
+type Params struct {
+	fx.In
 
-	samlSP, err := newSamlSP(port, idpURL)
+	Log    *zap.Logger
+	Config *config.Config
+}
+
+func New(p Params) (*ServiceProvider, error) {
+	samlSP, err := NewSAML(fmt.Sprintf(":%d", p.Config.ServiceProvider.Port), "http://localhost:8124/metadata")
 	if err != nil {
 		panic(err)
 	}
@@ -56,19 +59,39 @@ func ServiceProvider(p int, idpURL string) {
 		r.Handle("/static/*", http.StripPrefix("/static", http.FileServer(http.Dir("web/static/"))))
 	})
 
-	go http.ListenAndServe("localhost"+port, root)
+	return &ServiceProvider{
+		log: p.Log,
+		server: &http.Server{
+			Addr:    fmt.Sprintf("localhost:%d", p.Config.ServiceProvider.Port),
+			Handler: root,
+		},
+	}, nil
+}
 
-	fmt.Println("press q + <Enter> to exit...")
-	for {
-		b, err := bufio.NewReader(os.Stdin).ReadBytes('\n')
+func RegisterHooks(lc fx.Lifecycle, s *ServiceProvider) {
+	lc.Append(fx.Hook{
+		OnStart: s.Start,
+		OnStop:  s.server.Shutdown,
+	})
+}
+
+func (s *ServiceProvider) Start(_ context.Context) error {
+	go func() {
+		err := s.server.ListenAndServe()
 		if err != nil {
-			fmt.Println(err)
+			s.log.Error("error shutting down server", zap.Error(err))
 		}
-		if string(b) == "q\n" {
-			fmt.Println("exiting")
-			return
-		}
-	}
+	}()
+	return nil
+}
+
+var sessionManager *scs.SessionManager
+
+func newSessionManager() {
+	gob.Register(&User{})
+
+	sessionManager = scs.New()
+	sessionManager.Lifetime = time.Minute * 3
 }
 
 func home(w http.ResponseWriter, r *http.Request) {
@@ -77,14 +100,14 @@ func home(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 	}
 
-	renderTemplate(w, r, "home.html", &templateData{
+	template.Render(w, r, "home.html", &template.Data{
 		PageTitle: "home",
 		UID:       user.UID,
 	})
 }
 
 func login(w http.ResponseWriter, r *http.Request) {
-	renderTemplate(w, r, "login.html", &templateData{
+	template.Render(w, r, "login.html", &template.Data{
 		PageTitle: "login",
 	})
 }

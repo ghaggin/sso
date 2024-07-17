@@ -7,8 +7,32 @@
         {
             "type": "go",
             "request": "attach",
-            "name": "debug_service_provider",
+            "name": "debug_sp_attach",
             "processId": "sp_idp"
+        },
+        {
+            "type": "go",
+            "request": "launch",
+            "name": "debug_idp_launch",
+            "program": "${workspaceFolder}/tmp/sp_idp",
+            "args": [
+                "--mode","idp",
+            ],
+            "mode": "exec",
+            "stopOnEntry": true,
+            "preLaunchTask": "build_sp_idp"
+        },
+        {
+            "type": "go",
+            "request": "launch",
+            "name": "debug_sp_launch",
+            "program": "${workspaceFolder}/tmp/sp_idp",
+            "args": [
+                "--mode","sp",
+            ],
+            "mode": "exec",
+            "stopOnEntry": true,
+            "preLaunchTask": "build_sp_idp"
         }
     ]
 }

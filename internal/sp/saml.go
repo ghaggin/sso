@@ -1,4 +1,4 @@
-package internal
+package sp
 
 import (
 	"bytes"
@@ -9,16 +9,17 @@ import (
 
 	"github.com/crewjam/saml"
 	"github.com/crewjam/saml/samlsp"
+	"github.com/ghaggin/sso/internal/config"
 	dsig "github.com/russellhaering/goxmldsig"
 )
 
-type SamlServiceProvider interface {
+type SAML interface {
 	ServeMetadata(w http.ResponseWriter, _ *http.Request)
 	ServeACS(w http.ResponseWriter, r *http.Request)
 	HandleStartAuthFlow(w http.ResponseWriter, r *http.Request)
 }
 
-type samlServiceProvider struct {
+type samlImpl struct {
 	ServiceProvider *saml.ServiceProvider
 	Binding         string
 	ResponseBinding string
@@ -26,7 +27,7 @@ type samlServiceProvider struct {
 	RequestTracker  samlsp.RequestTracker
 }
 
-func newSamlSP(port, idpURL string) (SamlServiceProvider, error) {
+func NewSAML(port, idpURL string) (SAML, error) {
 	idpMetadataURL, err := url.Parse(idpURL)
 	if err != nil {
 		return nil, err
@@ -41,7 +42,7 @@ func newSamlSP(port, idpURL string) (SamlServiceProvider, error) {
 		return nil, err
 	}
 
-	key, cert, err := getKeyPair("sp")
+	key, cert, err := config.GetKeyPair("sp")
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +69,7 @@ func newSamlSP(port, idpURL string) (SamlServiceProvider, error) {
 		opts.LogoutBindings = []string{saml.HTTPPostBinding}
 	}
 
-	samlSP := &samlServiceProvider{
+	samlSP := &samlImpl{
 		Binding:         "",
 		ResponseBinding: saml.HTTPPostBinding,
 		OnError:         samlsp.DefaultOnError,
@@ -96,10 +97,9 @@ func newSamlSP(port, idpURL string) (SamlServiceProvider, error) {
 	}
 
 	return samlSP, nil
-	// return samlsp.New(opts)
 }
 
-func (s *samlServiceProvider) ServeMetadata(w http.ResponseWriter, _ *http.Request) {
+func (s *samlImpl) ServeMetadata(w http.ResponseWriter, _ *http.Request) {
 	buf, err := xml.MarshalIndent(s.ServiceProvider.Metadata(), "", "  ")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -113,7 +113,7 @@ func (s *samlServiceProvider) ServeMetadata(w http.ResponseWriter, _ *http.Reque
 	}
 }
 
-func (s *samlServiceProvider) ServeACS(w http.ResponseWriter, r *http.Request) {
+func (s *samlImpl) ServeACS(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
 		s.OnError(w, r, err)
@@ -148,7 +148,7 @@ func (s *samlServiceProvider) ServeACS(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusFound)
 }
 
-func (s *samlServiceProvider) HandleStartAuthFlow(w http.ResponseWriter, r *http.Request) {
+func (s *samlImpl) HandleStartAuthFlow(w http.ResponseWriter, r *http.Request) {
 	var binding, bindingLocation string
 	if s.Binding != "" {
 		binding = s.Binding
