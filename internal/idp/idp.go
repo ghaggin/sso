@@ -2,6 +2,7 @@ package idp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -22,6 +23,9 @@ type IdentityProvider struct {
 	server *http.Server
 	sm     *middleware.SessionManager
 	ctrl   *Controller
+
+	// start/stop coordination
+	shutdownCalled bool
 }
 
 type Params struct {
@@ -61,6 +65,7 @@ func New(p Params) (*IdentityProvider, error) {
 		server: &http.Server{
 			Addr: fmt.Sprintf("localhost:%d", p.Config.IdentityProvider.Port),
 		},
+		ctrl: p.Controller,
 	}
 
 	// Setup Router
@@ -73,14 +78,22 @@ func New(p Params) (*IdentityProvider, error) {
 		r.HandleFunc("/sso", idpServer.IDP.ServeSSO)
 	})
 
+	// Login Flow
 	root.Get("/login", idp.getLogin)
 	root.Post("/login", idp.putLogin)
 	root.Get("/redirect", idp.redirect)
 
+	// Public SAML Information
 	root.Get("/metadata", func(w http.ResponseWriter, r *http.Request) {
 		idpServer.IDP.ServeMetadata(w, r)
 	})
 
+	// Admin UI
+	root.Get("/users", idp.getUsers)
+	root.Post("/users", idp.postUsers)
+	root.Get("/users/new", idp.getUsersNew)
+
+	// API
 	root.Get("/service", idpServer.HandleGetService)
 	root.Put("/service", idpServer.HandlePutService)
 	root.Post("/service", idpServer.HandlePutService)
@@ -94,19 +107,26 @@ func New(p Params) (*IdentityProvider, error) {
 // RegisterHooks should be invoked by fx
 func RegisterHooks(lc fx.Lifecycle, i *IdentityProvider) {
 	lc.Append(fx.Hook{
-		OnStart: i.Start,
-		OnStop:  i.server.Shutdown,
+		OnStart: i.start,
+		OnStop:  i.stop,
 	})
 }
 
-func (i *IdentityProvider) Start(_ context.Context) error {
+func (i *IdentityProvider) start(_ context.Context) error {
 	go func() {
 		err := i.server.ListenAndServe()
-		if err != nil {
+		if i.shutdownCalled && errors.Is(err, http.ErrServerClosed) {
+			return
+		} else if err != nil {
 			i.log.Error("error starting server", zap.Error(err))
 		}
 	}()
 	return nil
+}
+
+func (i *IdentityProvider) stop(ctx context.Context) error {
+	i.shutdownCalled = true
+	return i.server.Shutdown(ctx)
 }
 
 func (i *IdentityProvider) requireAuth(next http.Handler) http.Handler {
@@ -149,9 +169,7 @@ func (i *IdentityProvider) putLogin(w http.ResponseWriter, r *http.Request) {
 	username := r.Form.Get("username")
 	password := r.Form.Get("password")
 
-	i.log.Info("login attempt", zap.String("username", username), zap.String("password", password))
-	valid, err := i.ctrl.ValidateLogin(username, password)
-
+	valid, err := i.ctrl.ValidateLogin(r.Context(), username, password)
 	renderErr := false
 	renderErrMsg := ""
 	if err != nil {
@@ -189,6 +207,10 @@ func (i *IdentityProvider) putLogin(w http.ResponseWriter, r *http.Request) {
 
 func (i *IdentityProvider) redirect(w http.ResponseWriter, r *http.Request) {
 	if rr, found := i.sm.LoadLoginRedirectState(r.Context()); found {
+		if rr.URL.Path != "/sso" {
+			http.Redirect(w, r, rr.URL.Path, http.StatusSeeOther)
+		}
+
 		for _, cookie := range r.Cookies() {
 			rr.AddCookie(cookie)
 		}
@@ -196,9 +218,65 @@ func (i *IdentityProvider) redirect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, "/", http.StatusFound)
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func (i *IdentityProvider) renderError(w http.ResponseWriter, _ *http.Request, err error) {
 	w.Write([]byte(err.Error()))
+}
+
+func (i *IdentityProvider) getUsersNew(w http.ResponseWriter, r *http.Request) {
+	err := template.Render(w, r, "idp/users_new.html", &model.IDPLoginData{
+		BaseData: model.BaseData{
+			PageTitle: "New User",
+		},
+	})
+	if err != nil {
+		i.log.Error("error rendering idp/users_new.html", zap.Error(err))
+		i.renderError(w, r, err)
+	}
+}
+
+func (i *IdentityProvider) getUsers(w http.ResponseWriter, r *http.Request) {
+	users, err := i.ctrl.GetUsers(r.Context())
+	if err != nil {
+		i.log.Error("getting users", zap.Error(err))
+		i.renderError(w, r, err)
+		return
+	}
+
+	data := struct {
+		model.BaseData
+		Users []model.User
+	}{
+		BaseData: model.BaseData{
+			PageTitle: "Users",
+		},
+		Users: users,
+	}
+
+	err = template.Render(w, r, "idp/users.html", &data)
+	if err != nil {
+		i.log.Error("error rendering idp/users.html", zap.Error(err))
+		i.renderError(w, r, err)
+	}
+}
+
+func (i *IdentityProvider) postUsers(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+
+	err := i.ctrl.CreateUser(r.Context(), &model.User{
+		Name:     r.Form.Get("username"),
+		Password: r.Form.Get("password"),
+		First:    r.Form.Get("firstname"),
+		Last:     r.Form.Get("lastname"),
+		Email:    r.Form.Get("email"),
+	})
+
+	if err != nil {
+		i.log.Error("error creating user", zap.Error(err))
+		i.renderError(w, r, err)
+	}
+
+	http.Redirect(w, r, "/users", http.StatusSeeOther)
 }

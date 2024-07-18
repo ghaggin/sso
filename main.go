@@ -6,6 +6,7 @@ import (
 	"github.com/ghaggin/sso/internal/config"
 	"github.com/ghaggin/sso/internal/idp"
 	"github.com/ghaggin/sso/internal/middleware"
+	"github.com/ghaggin/sso/internal/repository"
 	"github.com/ghaggin/sso/internal/sp"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -24,6 +25,7 @@ func main() {
 			zap.NewDevelopment,
 			config.New,
 			middleware.NewSessionManager,
+			repository.NewJSON,
 			newMode,
 		),
 	)

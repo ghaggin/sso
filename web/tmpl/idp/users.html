@@ -1,0 +1,26 @@
+{{template "base_layout" .}}
+{{define "base_content"}}
+<h1>Users</h1>
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Username</th>
+            <th>First</th>
+            <th>Last</th>
+            <th>Email</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .Users}}
+        <tr>
+            <td>{{.ID}}</td>
+            <td>{{.Name}}</td>
+            <td>{{.First}}</td>
+            <td>{{.Last}}</td>
+            <td>{{.Email}}</td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{end}}

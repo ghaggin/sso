@@ -2,3 +2,4 @@ a.out
 sp_idp
 tmp/*
 !tmp/.keep
+data/

@@ -3,6 +3,7 @@ package config
 type Config struct {
 	IdentityProvider IdentityProvider
 	ServiceProvider  ServiceProvider
+	JSONRepo         JSONRepo
 }
 
 type IdentityProvider struct {
@@ -13,6 +14,10 @@ type ServiceProvider struct {
 	Port int
 }
 
+type JSONRepo struct {
+	Path string
+}
+
 func New() (*Config, error) {
 	return &Config{
 		IdentityProvider: IdentityProvider{
@@ -20,6 +25,9 @@ func New() (*Config, error) {
 		},
 		ServiceProvider: ServiceProvider{
 			Port: 8123,
+		},
+		JSONRepo: JSONRepo{
+			Path: "data/repo.json",
 		},
 	}, nil
 }
